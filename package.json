@@ -15,7 +15,7 @@
     "telegram-bot"
   ],
   "author": "YuanChu",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.2.3",

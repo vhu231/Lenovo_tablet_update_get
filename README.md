@@ -80,15 +80,37 @@ Lenovo_tablet_update_get/
 
 ### 4. Python OTA 检查脚本 (`lenovootacheck.py`)
 
-独立的 Python 脚本，用于模拟设备检查 OTA 更新。
+独立的 Python 脚本，通过逆向分析联想 OTA 应用的 Smali 代码，模拟设备向联想 OTA 服务器发送固件更新查询请求。
+
+**用途：**
+
+- 模拟联想平板设备的 OTA 更新检查流程
+- 直接调用联想内部 OTA API (`ota.lenovo.com/ota-server/firmware/query/for-text-desc`)
+- 解析服务器返回的 XML 响应，提取固件版本、下载链接、校验值等信息
 
 **使用方法：**
 
+1. 修改脚本中的 `DEVICE_INFO` 字典，填入目标设备信息：
+
+```python
+DEVICE_INFO = {
+    "devicemodel": "TB710FU",           # 设备型号
+    "deviceid": "HA29117A",             # 设备 SN/IMEI
+    "curfirmwarever": "TB710FU_RF01_250925",  # 当前固件版本
+    "locale": "zh_CN",                  # 语言代码
+    "nationcode": "zh_CN",              # 国家代码
+    "pid": "123456",                    # LSF PID
+}
+```
+
+2. 运行脚本：
+
 ```bash
+pip install requests
 python lenovootacheck.py
 ```
 
-需要在脚本中修改 `DEVICE_INFO` 字典以匹配目标设备信息。
+**注意：** 此脚本使用的 API 端点与 Bot/Worker 不同，是基于逆向工程获取的内部接口，仅供研究参考。
 
 ## 部署指南
 
@@ -154,15 +176,16 @@ const WORKER_URL = "https://your-worker.your-subdomain.workers.dev/";
 
 本项目调用以下联想 API：
 
-| API | 用途 |
-|-----|------|
-| `ptstpd.lenovo.com.cn/home/ConfigurationQuery/getMachineSequenceInfo` | 根据 SN 获取设备信息 |
-| `ptstpd.lenovo.com.cn/home/ConfigurationQuery/getPadFlashingMachine` | 根据 MTM 获取刷机包信息 |
-| `ota.lenovo.com/engine/upgrade` | 查询 OTA 增量更新 |
+| API | 用途 | 使用模块 |
+|-----|------|----------|
+| `ptstpd.lenovo.com.cn/home/ConfigurationQuery/getMachineSequenceInfo` | 根据 SN 获取设备信息 | Bot, Worker |
+| `ptstpd.lenovo.com.cn/home/ConfigurationQuery/getPadFlashingMachine` | 根据 MTM 获取刷机包信息 | Bot, Worker |
+| `ota.lenovo.com/engine/upgrade` | 查询 OTA 增量更新 | Bot, Worker |
+| `ota.lenovo.com/ota-server/firmware/query/for-text-desc` | 模拟设备查询 OTA 更新 (逆向接口) | Python 脚本 |
 
 ## 许可证
 
-ISC
+MIT License
 
 ## 免责声明
 

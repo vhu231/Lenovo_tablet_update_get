@@ -1,0 +1,25 @@
+{
+  "name": "lenovo-tablet-update-get",
+  "version": "1.0.0",
+  "description": "联想平板刷机包查询工具 - 支持 Telegram Bot、Cloudflare Worker/Pages 部署",
+  "main": "lenovo9008.js",
+  "scripts": {
+    "start": "node lenovo9008.js",
+    "bot": "node lenovo9008.js"
+  },
+  "keywords": [
+    "lenovo",
+    "tablet",
+    "firmware",
+    "ota",
+    "telegram-bot"
+  ],
+  "author": "YuanChu",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "node-fetch": "^3.3.2",
+    "telegraf": "^4.16.3"
+  }
+}

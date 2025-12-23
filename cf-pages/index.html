@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联想(非官方)平板刷机包查询工具 - Lenovo (Not Official) Tablet ROM Query Tool</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 设置 Inter 字体 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            /* 背景图片样式 */
+            background-image: url('https://s2.loli.net/2025/11/07/kbTDavEuLsA8Jnz.jpg');
+            background-size: cover; /* 确保背景图覆盖整个视口 */
+            background-position: center; /* 背景图居中 */
+            background-attachment: fixed; /* 背景图固定，不随滚动条滚动 */
+            background-color: #333; /* 图片加载失败时的备用颜色 */
+        }
+        /* 美化链接 */
+        .download-link {
+            color: #1d4ed8;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+        /* 确保错误信息显示在最上层 */
+        #errorMessage {
+            z-index: 50; /* Tailwind z-index 50 */
+            margin-top: 1.5rem; /* 增加与上方元素的距离 */
+        }
+        /* 水印容器样式 - 确保不拦截鼠标事件 */
+        #watermark-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 40; /* 放在普通内容之上，但低于错误弹窗(50) */
+            background-repeat: repeat;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- 水印容器 -->
+    <div id="watermark-overlay"></div>
+
+    <!-- 内容容器：bg-opacity-70 -->
+    <!-- 添加 relative 和 z-10 确保内容区域有明确的层级结构，但在视觉上水印会覆盖它 -->
+    <div class="w-full max-w-2xl bg-white bg-opacity-70 backdrop-filter backdrop-blur-sm shadow-2xl rounded-xl p-6 md:p-10 border-2 border-blue-400 border-opacity-70 relative z-10">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2">刷机包查询 (ROM Query)</h1>
+            <p class="text-gray-500">通过序列号 (SN) 或 MTM 产品编码查询完整包及 OTA 增量包信息。</p>
+        </header>
+
+        <!-- 输入表单 -->
+        <div class="space-y-6 mb-8">
+            <div>
+                <label for="sn" class="block text-sm font-medium text-gray-700 mb-1">序列号 (SN) / MTM 编码 <span class="text-red-500">*</span></label>
+                <input type="text" id="sn" placeholder="请输入序列号（8位，如 HA25QW7B）或 MTM 编码（10位，如 ZAG40004CN）" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                       autocomplete="off">
+                <p class="mt-1 text-xs text-gray-500">提示 (Hint)：SN (8位) and MTM (10位) 任选其一输入即可。</p>
+            </div>
+            
+            <div>
+                <label for="currentFirmware" class="block text-sm font-medium text-gray-700 mb-1">当前固件版本 (Current Firmware Version, Optional)</label>
+                <input type="text" id="currentFirmware" placeholder="例如 (E.g.): TB710FU_CN_OPEN_USER_QSM8650_V_ZUI_17.0.04.279_ST_250808" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                       autocomplete="off">
+                <p class="mt-1 text-xs text-gray-500">用于查询增量包 (Used for OTA query)。完整固件版本号通常很长，请仔细输入或复制。</p>
+            </div>
+
+            <button id="queryButton" 
+                    class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50">
+                <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="buttonText">开始查询 (Start Query)</span>
+            </button>
+
+            <!-- Telegram Bot 跳转按钮 -->
+            <a href="https://t.me/LenovoTablet_Bot" target="_blank" rel="noopener noreferrer"
+               class="w-full flex items-center justify-center px-6 py-3 border border-blue-300 text-base font-medium rounded-lg shadow-sm text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+                使用 Telegram Bot
+            </a>
+        </div>
+        
+        <!-- 错误信息提示 - 确保它位于结果容器之前或同级，以便更容易控制显示 -->
+        <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong class="font-bold">查询失败 (Query Failed)!</strong>
+            <span id="errorText" class="block sm:inline ml-2"></span>
+        </div>
+
+        <!-- 结果展示区域 -->
+        <div id="resultsContainer" class="hidden space-y-6 pt-6 border-t border-gray-200">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">查询结果 (Query Results)</h2>
+            
+            <!-- 机器信息卡片 -->
+            <div id="machineInfoCard" class="bg-gray-50 p-4 rounded-lg shadow-inner">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM6 10a1 1 0 000 2h8a1 1 0 100-2H6z"></path></svg>
+                    产品信息 (Product Info)
+                    <span id="infoStatus" class="ml-2 font-normal text-xs px-2 py-0.5 rounded-full bg-red-200 text-red-800 hidden"></span>
+                </h3>
+                <dl class="text-sm grid grid-cols-2 gap-x-4 gap-y-2">
+                    <dt class="font-medium text-gray-600">产品名称 (Product Name):</dt><dd id="resProductName" class="font-bold text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">机器名称 (Machine Name):</dt><dd id="resMachineName" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">序列号 (SN):</dt><dd id="resSn" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">产品型号 (MTM):</dt><dd id="resMtm" class="text-gray-900"></dd>
+                    
+                    <dt class="font-medium text-gray-600">出厂日期 (Product Date):</dt><dd id="resProductDate" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">扫描日期 (Scan Date):</dt><dd id="resScanDate" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">包装批号 (Packing Lot No.):</dt><dd id="resPackingLotNo" class="text-gray-900"></dd>
+                    
+                    <dt class="font-medium text-gray-600">销售订单号 (Sale Order):</dt><dd id="resSaleOrder" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">销售区域 (Sale Area):</dt><dd id="resSaleArea" class="text-gray-900"></dd>
+                    <dt class="font-medium text-gray-600">产品系列 (Product Series):</dt><dd id="resProductSeries" class="text-gray-900"></dd>
+                </dl>
+            </div>
+
+            <!-- 完整包信息卡片 -->
+            <div id="fullPackageCard" class="bg-indigo-50 p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-indigo-700 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM13 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z"></path></svg>
+                    完整刷机包 (Full ROM)
+                </h3>
+                <p class="text-sm font-medium mb-1">最新版本 (Latest Version): <span id="resFullVersion" class="font-bold text-indigo-800"></span></p>
+                <p class="text-sm font-medium mb-3">刷机方式 (Flashing Method): <span id="resFlashingMethod" class="text-indigo-800"></span></p>
+                <!-- 新增解压密码提示 -->
+                <p class="text-sm font-bold text-red-600 mb-1">解压密码为 (Unzip Password): FC(fv:SknR</p>
+                <!-- 下载链接 -->
+                <p class="text-sm font-medium">下载链接 (Download Link):</p>
+                <a id="resFullDownload" target="_blank" class="download-link text-xs"></a>
+            </div>
+
+            <!-- 增量包信息卡片 -->
+            <div id="otaCard" class="bg-green-50 p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-green-700 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm2 4a1 1 0 00-1 1v7a1 1 0 001 1h10a1 1 0 001-1v-7a1 1 0 00-1-1H5zm6 4a1 1 0 10-2 0 1 1 0 002 0z" clip-rule="evenodd"></path></svg>
+                    增量更新包 (OTA) <span id="otaStatus" class="ml-2 font-normal text-xs px-2 py-0.5 rounded-full bg-green-200 text-green-800"></span>
+                </h3>
+                <div id="otaDetails">
+                    <!-- 动态加载内容 -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // Worker URL 配置
+        // ----------------------------------------------------
+        const WORKER_URL = "https://api.lenovo.niantic.club/"; 
+        // ----------------------------------------------------
+
+        const snInput = document.getElementById('sn');
+        const currentFirmwareInput = document.getElementById('currentFirmware');
+        const queryButton = document.getElementById('queryButton');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const spinner = document.getElementById('spinner');
+        const buttonText = document.getElementById('buttonText');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        // 结果 DOM 元素
+        const resProductName = document.getElementById('resProductName'); 
+        const resSn = document.getElementById('resSn');
+        const resMtm = document.getElementById('resMtm');
+        const resMachineName = document.getElementById('resMachineName');
+        const resPackingLotNo = document.getElementById('resPackingLotNo'); // 新增
+        const resSaleOrder = document.getElementById('resSaleOrder'); // 新增
+        const resProductDate = document.getElementById('resProductDate');
+        const resScanDate = document.getElementById('resScanDate'); 
+        const resSaleArea = document.getElementById('resSaleArea');
+        const resProductSeries = document.getElementById('resProductSeries');
+        const resFullVersion = document.getElementById('resFullVersion');
+        const resFlashingMethod = document.getElementById('resFlashingMethod');
+        const resFullDownload = document.getElementById('resFullDownload');
+        const otaCard = document.getElementById('otaCard');
+        const otaDetails = document.getElementById('otaDetails');
+        const otaStatus = document.getElementById('otaStatus');
+        const fullPackageCard = document.getElementById('fullPackageCard'); // 新增
+        const infoStatus = document.getElementById('infoStatus'); // 新增
+
+        // ----------------------------------------------------
+        // 水印生成逻辑 (Watermark Generation Logic)
+        // ----------------------------------------------------
+        (function generateWatermark() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 设置画布大小（水印单元格大小）
+            const size = 320;
+            canvas.width = size;
+            canvas.height = size;
+            
+            // 配置文字样式
+            ctx.font = 'bold 20px Inter, sans-serif';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; // 加深颜色和不透明度
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 旋转并绘制
+            ctx.translate(size / 2, size / 2);
+            ctx.rotate(-45 * Math.PI / 180);
+            
+            // 绘制中英文双语
+            ctx.fillText('!!!非联想官方网站!!!', 0, -16);
+            ctx.fillText('!!!Not Official Lenovo Website!!!', 0, 16);
+            
+            // 将 Canvas 转为 Data URL 并设置为背景
+            const dataUrl = canvas.toDataURL('image/png');
+            const watermarkOverlay = document.getElementById('watermark-overlay');
+            if (watermarkOverlay) {
+                watermarkOverlay.style.backgroundImage = `url(${dataUrl})`;
+            }
+        })();
+        // ----------------------------------------------------
+
+        function setLoading(isLoading) {
+            queryButton.disabled = isLoading;
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+                buttonText.textContent = '查询中... (Querying...)';
+                resultsContainer.classList.add('hidden');
+                errorMessage.classList.add('hidden'); // 开始查询时隐藏所有提示
+            } else {
+                spinner.classList.add('hidden');
+                buttonText.textContent = '开始查询 (Start Query)';
+            }
+        }
+
+        function displayError(message) {
+            console.error("Displaying Error:", message); // 添加日志，方便调试
+            const englishTranslation = " (Please verify the provided SN/MTM or check the network connection.)";
+            errorText.textContent = message + englishTranslation;
+            
+            // 确保隐藏结果容器，并显示错误信息
+            resultsContainer.classList.add('hidden');
+            errorMessage.classList.remove('hidden');
+        }
+
+        function safeText(text) {
+            return text || 'N/A';
+        }
+
+        function displayResults(data) {
+            // 查询成功时，隐藏错误信息
+            errorMessage.classList.add('hidden');
+
+            const mInfo = data.machineInfo;
+            const fPackage = data.fullPackage;
+            const otaPackage = data.otaPackage;
+            const currentVersion = currentFirmwareInput.value.trim();
+
+            const snOrMtmInput = snInput.value.trim().toUpperCase();
+            
+            // --- 1. 产品信息卡片 (Machine Info Card) ---
+
+            // 设置产品名称 (如果完整包信息存在)
+            resProductName.textContent = fPackage ? safeText(fPackage.product_name) : 'N/A';
+            
+            // 设置 SN 和 MTM
+            resSn.textContent = mInfo ? safeText(mInfo.SN) : snOrMtmInput; // 如果是SN查询，用返回的SN，否则用输入值
+            resMtm.textContent = fPackage ? safeText(fPackage.mtm) : (mInfo ? safeText(mInfo.MTM) : snOrMtmInput); 
+            
+            // 机器信息字段（SN查询才有完整数据，MTM查询很多是N/A）
+            const infoSource = mInfo || {}; // 使用 mInfo 填充，如果 mInfo 为 null 则使用空对象
+            resMachineName.textContent = safeText(infoSource.MachineName);
+            resPackingLotNo.textContent = safeText(infoSource.PackingLotNo);
+            resSaleOrder.textContent = safeText(infoSource.SaleOrder); // 新增
+            resProductDate.textContent = safeText(infoSource.ProductDate);
+            resScanDate.textContent = safeText(infoSource.ScanDate);
+            resSaleArea.textContent = safeText(infoSource.SaleArea);
+            resProductSeries.textContent = safeText(infoSource.ProductSeries);
+
+            // 检查是否有完整包信息
+            if (fPackage) {
+                // 有刷机包：显示完整包卡片，并更新状态
+                fullPackageCard.classList.remove('hidden');
+                infoStatus.classList.add('hidden');
+
+                // 2. 完整包信息
+                resFullVersion.textContent = safeText(fPackage.latest_version);
+                resFlashingMethod.textContent = safeText(fPackage.flashing_machine_method);
+                resFullDownload.textContent = safeText(fPackage.download_url);
+                resFullDownload.href = fPackage.download_url || '#';
+            } else {
+                // 无刷机包：隐藏完整包卡片，并更新状态提示
+                fullPackageCard.classList.add('hidden');
+                infoStatus.classList.remove('hidden');
+                infoStatus.textContent = '未找到刷机包 (No ROM Found)';
+            }
+            
+            // --- 3. 增量包信息卡片 (OTA Card) ---
+
+            // 增量包查询仅在提供了固件版本，且有 MTM 或 ProductModel 时尝试
+            otaDetails.innerHTML = '';
+            otaCard.classList.remove('hidden'); // 始终显示 OTA 卡片，即使没有查询条件
+            
+            if (currentVersion && (mInfo || fPackage)) {
+                if (otaPackage) {
+                    otaStatus.textContent = '有可用更新 (Update Available)';
+                    otaStatus.className = 'ml-2 font-normal text-xs px-2 py-0.5 rounded-full bg-green-500 text-white';
+                    otaDetails.innerHTML = `
+                        <p class="text-sm font-medium mb-1">当前版本 (Current Version): <span class="font-normal text-green-800">${currentVersion}</span></p>
+                        <p class="text-sm font-medium mb-3">目标版本 (Target Version): <span class="font-bold text-green-800">${safeText(otaPackage.version)}</span></p>
+                        <p class="text-sm font-medium">下载链接 (Download Link):</p>
+                        <a href="${otaPackage.url || '#'}" target="_blank" class="download-link text-xs">${safeText(otaPackage.url)}</a>
+                    `;
+                } else {
+                    otaStatus.textContent = '未发现更新 (No Update Found)';
+                    otaStatus.className = 'ml-2 font-normal text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800';
+                    otaDetails.innerHTML = `<p class="text-sm text-gray-600">当前版本 (Current Version) <span class="font-normal text-gray-800">${currentVersion}</span> 没有可用的增量更新包，或已是最新。</p>`;
+                }
+            } else {
+                otaStatus.textContent = '未查询 (Not Queried)';
+                otaStatus.className = 'ml-2 font-normal text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-800';
+                otaDetails.innerHTML = '<p class="text-sm text-gray-600">请提供“当前固件版本 (Current Firmware Version)”以查询增量包。</p>';
+            }
+
+
+            resultsContainer.classList.remove('hidden');
+        }
+
+        async function handleQuery() {
+            const snOrMtm = snInput.value.trim().toUpperCase();
+            const currentFirmwareVersion = currentFirmwareInput.value.trim();
+
+            if (!snOrMtm) {
+                return displayError('序列号/MTM 不能为空！ (SN/MTM cannot be empty!)');
+            }
+            
+            let sn = null;
+            let mtm = null;
+
+            // 逻辑：根据长度精确判断
+            if (snOrMtm.length === 8) {
+                sn = snOrMtm;
+            } else if (snOrMtm.length === 10) {
+                mtm = snOrMtm;
+            } else {
+                return displayError(`输入格式错误 (Invalid Input)! 序列号 (SN) 必须是 8 位，MTM 编码必须是 10 位。您输入了 ${snOrMtm.length} 位。`);
+            }
+            
+            setLoading(true);
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sn: sn, mtm: mtm, currentFirmwareVersion }) // 传递 SN 和 MTM 供后端判断
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayResults(result);
+                } else {
+                    // 这里会捕获到后端返回的 result.error 字段
+                    // 确保使用 displayError 显示后端返回的错误信息
+                    displayError(result.error || '未知查询错误 (Unknown Query Error)。');
+                }
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                displayError(`网络请求失败 (Network Request Failed)。请检查 Worker URL 和网络连接。 (${error.message})`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        queryButton.addEventListener('click', handleQuery);
+        
+        // 允许按 Enter 键触发查询
+        [snInput, currentFirmwareInput].forEach(input => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    handleQuery();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
